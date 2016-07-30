@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
@@ -43,7 +44,8 @@ func main() {
 }
 
 func hough(i image.Image) (image.Image, error) {
-	println("yoyoyo")
+	minDist := math.Pow(2, 16) - 1
+	maxDist := float64(0)
 	width := i.Bounds().Dx()
 	height := i.Bounds().Dy()
 	midX := float64(width) / 2
@@ -54,26 +56,36 @@ func hough(i image.Image) (image.Image, error) {
 	dstSize := 400
 	hough := image.NewGray16(image.Rectangle{image.Point{0, 0}, image.Point{dstSize, dstSize}})
 
-	for x := 0; x < i.Bounds().Dx(); x++ {
-		for y := 0; y < i.Bounds().Dy(); y++ {
+	for x := 0; x < width; x++ {
+		for y := 0; y < height; y++ {
 			r, _, _, _ := i.At(x, y).RGBA()
 
 			px := float64(x) - midX
 			py := float64(y) - midY
 			//black pixel
 			if r == 0 {
-				//Get angle from centre
-				angle := math.Atan2(py, px)
-				//Get distance from centre
-				distance := math.Sqrt(px*px + py*py)
-				angle = normalise(-math.Pi, math.Pi, 0, float64(dstSize), angle)
-				distance = normalise(0, maxDistance, 0, float64(dstSize), distance)
-				g := hough.Gray16At(int(angle), int(distance))
-				g.Y += uuuuu
-				hough.SetGray16(int(angle), int(distance), g)
+				for t := 0; t < dstSize; t++ {
+					//Get angle from centre
+					angle := math.Atan2(py, px)
+					//Get distance from centre
+					distance := math.Sqrt(px*px + py*py)
+					if distance < minDist {
+						minDist = distance
+					}
+					if distance > maxDist {
+						maxDist = distance
+					}
+					angle = normalise(-math.Pi, math.Pi, 0, float64(dstSize), angle)
+					distance = normalise(0, maxDistance, 0, float64(dstSize), distance)
+					g := hough.Gray16At(int(angle), int(distance))
+					g.Y += 10000
+					hough.SetGray16(int(angle), int(distance), g)
+				}
 			}
 		}
 	}
+	fmt.Printf("Min dst: %v, scaled:%v\n", minDist, normalise(0, maxDistance, 0, float64(dstSize), minDist))
+	fmt.Printf("Max dst: %v, scaled:%v\n", maxDist, normalise(0, maxDistance, 0, float64(dstSize), maxDist))
 	return hough, nil
 	//r = x cos T + y sin T
 }
