@@ -52,6 +52,7 @@ func hough(i image.Image) (image.Image, error) {
 	midY := float64(height) / 2
 
 	maxDistance := math.Sqrt(float64(width*width+height*height)) / 2
+	println(maxDistance)
 
 	dstSize := 400
 	hough := image.NewGray16(image.Rectangle{image.Point{0, 0}, image.Point{dstSize, dstSize}})
@@ -64,22 +65,22 @@ func hough(i image.Image) (image.Image, error) {
 			py := float64(y) - midY
 			//black pixel
 			if r == 0 {
+				//iterate the angles
 				for t := 0; t < dstSize; t++ {
-					//Get angle from centre
-					angle := math.Atan2(py, px)
-					//Get distance from centre
-					distance := math.Sqrt(px*px + py*py)
+					angle := normalise(0, float64(dstSize), 0, math.Pi, float64(t))
+					//Get normal distance can be negative
+					distance := px*math.Cos(angle) + py*math.Sin(angle)
 					if distance < minDist {
 						minDist = distance
 					}
 					if distance > maxDist {
 						maxDist = distance
 					}
-					angle = normalise(-math.Pi, math.Pi, 0, float64(dstSize), angle)
-					distance = normalise(0, maxDistance, 0, float64(dstSize), distance)
-					g := hough.Gray16At(int(angle), int(distance))
-					g.Y += 10000
-					hough.SetGray16(int(angle), int(distance), g)
+					angle = normalise(0, math.Pi, 0, float64(dstSize), angle)
+					distance = normalise(-maxDistance, maxDistance, 0, float64(dstSize), distance)
+					g := hough.Gray16At(int(angle+0.5), int(distance+0.5))
+					g.Y += 100
+					hough.SetGray16(int(angle+0.5), int(distance+0.5), g)
 				}
 			}
 		}
