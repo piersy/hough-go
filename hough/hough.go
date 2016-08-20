@@ -17,12 +17,21 @@ func Hough(input image.Image, accDistance, accAngle int) draw.Image {
 	height := input.Bounds().Dy()
 	midX := float64(width) / 2
 	midY := float64(height) / 2
+	// Precalculate angles for sin [0] and cos [1]
+	angles := make([][]float64, 2)
+	angles[0] = make([]float64, accDistance)
+	angles[1] = make([]float64, accDistance)
+	// Converts our accumulator angle buckets into appropriate radian values between 0 and Pi
+	angleN := NewNormaliser(0, float64(accAngle), 0, math.Pi)
+	for t := 0; t < accAngle; t++ {
+		a := angleN.normalise(float64(t))
+		angles[0][t] = math.Sin(a)
+		angles[1][t] = math.Cos(a)
+	}
 
 	// The max distance from centre, used for normalising the distance from the
 	// source image to the size of the accumulator.
 	maxDistance := math.Sqrt(float64(width*width+height*height)) / 2
-	// Converts our accumulator angle buckets into appropriate radian values between 0 and Pi
-	angleN := NewNormaliser(0, float64(accAngle), 0, math.Pi)
 	distN := NewNormaliser(-maxDistance, maxDistance, 0, float64(accDistance))
 
 	acc := image.NewGray16(image.Rect(0, 0, accDistance, accAngle))
@@ -44,10 +53,8 @@ func Hough(input image.Image, accDistance, accAngle int) draw.Image {
 				// at angle t and hence the point (d(t), t) will conicide for
 				// all pixels along the line.
 				for t := 0; t < accAngle; t++ {
-					// Get angle between 0 and Pi
-					angle := angleN.normalise(float64(t))
 					//Get normal distance can be negative
-					distance := px*math.Cos(angle) + py*math.Sin(angle)
+					distance := px*angles[1][t] + py*angles[0][t]
 					// normalize distance into accumulator range
 					nDistance := int(distN.normalise(distance) + 0.5)
 					// update the accumulator
