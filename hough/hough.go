@@ -17,16 +17,15 @@ func Hough(input image.Image, accDistance, accAngle int) draw.Image {
 	height := input.Bounds().Dy()
 	midX := float64(width) / 2
 	midY := float64(height) / 2
-	// Precalculate angles for sin [0] and cos [1]
-	angles := make([][]float64, 2)
-	angles[0] = make([]float64, accDistance)
-	angles[1] = make([]float64, accDistance)
+	// Precalculate angles for sin and cos
+	sinAngles := make([]float64, accDistance)
+	cosAngles := make([]float64, accDistance)
 	// Converts our accumulator angle buckets into appropriate radian values between 0 and Pi
 	angleN := NewNormaliser(0, float64(accAngle), 0, math.Pi)
 	for t := 0; t < accAngle; t++ {
 		a := angleN.normalise(float64(t))
-		angles[0][t] = math.Sin(a)
-		angles[1][t] = math.Cos(a)
+		sinAngles[t] = math.Sin(a)
+		cosAngles[t] = math.Cos(a)
 	}
 
 	// The max distance from centre, used for normalising the distance from the
@@ -34,6 +33,7 @@ func Hough(input image.Image, accDistance, accAngle int) draw.Image {
 	maxDistance := math.Sqrt(float64(width*width+height*height)) / 2
 	distN := NewNormaliser(-maxDistance, maxDistance, 0, float64(accDistance))
 
+	nrgba := *input.(*image.NRGBA)
 	acc := image.NewGray16(image.Rect(0, 0, accDistance, accAngle))
 	stride := acc.Stride
 	pix := acc.Pix
@@ -45,7 +45,7 @@ func Hough(input image.Image, accDistance, accAngle int) draw.Image {
 			py := float64(y) - midY
 
 			// check black pixel
-			r, g, b, _ := input.At(x, y).RGBA()
+			r, g, b, _ := nrgba.NRGBAAt(x, y).RGBA()
 			if r&g&b == 0 {
 				// For all angles represented in the accumulator, calculate
 				// perpendicular distance to the center of the input for a line
@@ -56,16 +56,17 @@ func Hough(input image.Image, accDistance, accAngle int) draw.Image {
 				// all pixels along the line.
 				for t := 0; t < accAngle; t++ {
 					//Get normal distance can be negative
-					distance := px*angles[1][t] + py*angles[0][t]
+					distance := px*cosAngles[t] + py*sinAngles[t]
 					// normalize distance into accumulator range
 					nDistance := int(distN.normalise(distance) + 0.5)
+					//		g := acc.Gray16At(t, nDistance)
+					//		g.Y += 100
+					//acc.SetGray16(t, nDistance, g)
 					// update the accumulator
-					// row times the width of the image in bytes + the column * size of pixel in bytes
+					// Get pixel start location
 					pixStart := nDistance*stride + t*2
-					// pack the 2 bytes into a uint16
 					val := uint16(pix[pixStart])<<8 | uint16(pix[pixStart+1])
 					val += 100
-					// unpack back into the pix slice
 					pix[pixStart] = uint8(val >> 8)
 					pix[pixStart+1] = uint8(val)
 				}
