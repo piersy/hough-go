@@ -35,6 +35,8 @@ func Hough(input image.Image, accDistance, accAngle int) draw.Image {
 	distN := NewNormaliser(-maxDistance, maxDistance, 0, float64(accDistance))
 
 	acc := image.NewGray16(image.Rect(0, 0, accDistance, accAngle))
+	stride := acc.Stride
+	pix := acc.Pix
 
 	// Iterate each pixel in the source
 	for x := 0; x < width; x++ {
@@ -58,10 +60,14 @@ func Hough(input image.Image, accDistance, accAngle int) draw.Image {
 					// normalize distance into accumulator range
 					nDistance := int(distN.normalise(distance) + 0.5)
 					// update the accumulator
-					g := acc.Gray16At(t, nDistance)
-					g.Y += 100
-					acc.SetGray16(t, nDistance, g)
-
+					// row times the width of the image in bytes + the column * size of pixel in bytes
+					pixStart := nDistance*stride + t*2
+					// pack the 2 bytes into a uint16
+					val := uint16(pix[pixStart])<<8 | uint16(pix[pixStart+1])
+					val += 100
+					// unpack back into the pix slice
+					pix[pixStart] = uint8(val >> 8)
+					pix[pixStart+1] = uint8(val)
 				}
 			}
 		}
