@@ -21,6 +21,10 @@ func Hough(input image.Image, accDistance, accAngle int) draw.Image {
 	// The max distance from centre, used for normalising the distance from the
 	// source image to the size of the accumulator.
 	maxDistance := math.Sqrt(float64(width*width+height*height)) / 2
+	// Converts our accumulator angle buckets into appropriate radian values between 0 and Pi
+	angleN := NewNormaliser(0, float64(accAngle), 0, math.Pi)
+	distN := NewNormaliser(-maxDistance, maxDistance, 0, float64(accDistance))
+
 	acc := image.NewGray16(image.Rect(0, 0, accDistance, accAngle))
 
 	// Iterate each pixel in the source
@@ -41,11 +45,11 @@ func Hough(input image.Image, accDistance, accAngle int) draw.Image {
 				// all pixels along the line.
 				for t := 0; t < accAngle; t++ {
 					// Get angle between 0 and Pi
-					angle := normalise(0, float64(accAngle), 0, math.Pi, float64(t))
+					angle := angleN.normalise(float64(t))
 					//Get normal distance can be negative
 					distance := px*math.Cos(angle) + py*math.Sin(angle)
 					// normalize distance into accumulator range
-					nDistance := int(normalise(-maxDistance, maxDistance, 0, float64(accDistance), distance) + 0.5)
+					nDistance := int(distN.normalise(distance) + 0.5)
 					// update the accumulator
 					g := acc.Gray16At(t, nDistance)
 					g.Y += 100
@@ -58,6 +62,18 @@ func Hough(input image.Image, accDistance, accAngle int) draw.Image {
 	return acc
 }
 
-func normalise(srcMin, srcMax, dstMin, dstMax, srcVal float64) float64 {
-	return ((dstMax - dstMin) * (srcVal - srcMin) / (srcMax - srcMin)) + dstMin
+func NewNormaliser(srcMin, srcMax, dstMin, dstMax float64) noramliser {
+	return noramliser{
+		ratio:  (dstMax - dstMin) / (srcMax - srcMin),
+		srcMin: srcMin,
+		dstMin: dstMin,
+	}
+}
+
+type noramliser struct {
+	ratio, srcMin, dstMin float64
+}
+
+func (n noramliser) normalise(val float64) float64 {
+	return n.ratio*(val-n.srcMin) + n.dstMin
 }
