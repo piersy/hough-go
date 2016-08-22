@@ -10,8 +10,9 @@ import (
 
 type Context interface {
 	Color(color.Color)
-	Move(p image.Point)
-	Line(p image.Point)
+	MoveTo(p image.Point)
+	LineTo(p image.Point)
+	Line(dist, angle float64)
 	Render(im draw.Image) error
 }
 
@@ -19,13 +20,22 @@ type op interface {
 	do(i draw.Image) error
 }
 
-type line struct {
+type lineTo struct {
 	p1, p2 image.Point
 	c      color.Color
 }
 
-func (l line) do(i draw.Image) error {
+func (l lineTo) do(i draw.Image) error {
 	return DrawLine(l.p1, l.p2, l.c, i)
+}
+
+type line struct {
+	d, a float64
+	c    color.Color
+}
+
+func (l line) do(i draw.Image) error {
+	return nil
 }
 
 type context struct {
@@ -44,12 +54,16 @@ func New() Context {
 func (c *context) Color(col color.Color) {
 	c.c = col
 }
-func (c *context) Move(pt image.Point) {
+func (c *context) MoveTo(pt image.Point) {
 	c.p = pt
 }
 
-func (c *context) Line(pt image.Point) {
-	c.ops = append(c.ops, line{c.p, pt, c.c})
+func (c *context) LineTo(pt image.Point) {
+	c.ops = append(c.ops, lineTo{c.p, pt, c.c})
+}
+
+func (c *context) Line(d, a float64) {
+	c.ops = append(c.ops, line{d, a, c.c})
 }
 
 func (c *context) Render(im draw.Image) error {
@@ -63,19 +77,20 @@ func (c *context) Render(im draw.Image) error {
 }
 
 func DrawLine(p1, p2 image.Point, col color.Color, im draw.Image) error {
-	b := im.Bounds()
-	if !p1.In(b) {
-		return fmt.Errorf("Point %v not in bounds %v", p1, b)
-	}
-	if !p2.In(b) {
-		return fmt.Errorf("Point %v not in bounds %v", p2, b)
-	}
+	//	b := im.Bounds()
+	//	if !p1.In(b) {
+	//		return fmt.Errorf("Point %v not in bounds %v", p1, b)
+	//	}
+	//	if !p2.In(b) {
+	//		return fmt.Errorf("Point %v not in bounds %v", p2, b)
+	//	}
+	fmt.Printf("Drawing line %v %v \n", p1, p2)
 
 	// determine which way to draw the line
 	// top to bottom or left to right
 	xdiff := p2.X - p1.X
 	ydiff := p2.Y - p1.Y
-	fmt.Printf("xdiff: %d, ydiff: %d\n", xdiff, ydiff)
+	//fmt.Printf("xdiff: %d, ydiff: %d\n", xdiff, ydiff)
 	var yInc, xInc float64
 	var iter, inc int
 	//determine which direction the line is longest in
@@ -85,7 +100,7 @@ func DrawLine(p1, p2 image.Point, col color.Color, im draw.Image) error {
 		// value of xdiff
 		inc = int(int32(uint32(xdiff)&uint32(0x80000000))>>31 | 1)
 		xInc = float64(inc)
-		fmt.Printf("xinc %2f\n", xInc)
+		//fmt.Printf("xinc %2f\n", xInc)
 		yInc = float64(ydiff) / float64(xdiff)
 		//Remove possible negative sign given to yInc if xdiff was negative
 		yInc *= xInc
