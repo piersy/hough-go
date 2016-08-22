@@ -12,7 +12,7 @@ import (
 // line distance from centre of the input and the x axis represents the angle
 // of the line. Only black pixels are considered as contributing to the hough
 // transform.
-func Hough(input image.Image, accDistance, accAngle int) draw.Image {
+func Hough(input image.Image, accDistance, accAngle int) (draw.Image, []Line) {
 	width := input.Bounds().Dx()
 	height := input.Bounds().Dy()
 	midX := float64(width) / 2
@@ -33,11 +33,15 @@ func Hough(input image.Image, accDistance, accAngle int) draw.Image {
 	maxDistance := math.Sqrt(float64(width*width+height*height)) / 2
 	distN := NewNormaliser(-maxDistance, maxDistance, 0, float64(accDistance))
 
-	nrgba := *input.(*image.NRGBA)
+	nrgba := *input.(*image.RGBA)
 	acc := image.NewGray16(image.Rect(0, 0, accDistance, accAngle))
 	stride := acc.Stride
 	pix := acc.Pix
 
+	// keeps track of the highest scoring lines
+	tl := topLines{
+		lineCount: 100,
+	}
 	// Iterate each pixel in the source
 	for x := 0; x < width; x++ {
 		px := float64(x) - midX
@@ -45,7 +49,7 @@ func Hough(input image.Image, accDistance, accAngle int) draw.Image {
 			py := float64(y) - midY
 
 			// check black pixel
-			r, g, b, _ := nrgba.NRGBAAt(x, y).RGBA()
+			r, g, b, _ := nrgba.RGBAAt(x, y).RGBA()
 			if r&g&b == 0 {
 				// For all angles represented in the accumulator, calculate
 				// perpendicular distance to the center of the input for a line
@@ -66,14 +70,19 @@ func Hough(input image.Image, accDistance, accAngle int) draw.Image {
 					// Get pixel start location
 					pixStart := nDistance*stride + t*2
 					val := uint16(pix[pixStart])<<8 | uint16(pix[pixStart+1])
-					val += 100
+					val += 10
 					pix[pixStart] = uint8(val >> 8)
 					pix[pixStart+1] = uint8(val)
+
+					// Add the line to the top lines if it scores above the boundary
+					if val > tl.boundary {
+						tl.addLine(angleN.normalise(float64(t)), distance, val)
+					}
 				}
 			}
 		}
 	}
-	return acc
+	return acc, tl.lines()
 }
 
 func NewNormaliser(srcMin, srcMax, dstMin, dstMax float64) noramliser {
