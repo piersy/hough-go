@@ -1,13 +1,18 @@
-package hough
+package util
 
-import "image/color"
-import "image"
+import (
+	"image"
+	"image/color"
+	"math"
+)
 
 // Gray16 is an in-memory image whose At method returns color.Gray16 values.
 type Gray16 struct {
 	// Pix holds the image's pixels, as gray values in big-endian format. The pixel at
 	// (x, y) is at Pix[(y-Rect.Min.Y)*Stride + (x-Rect.Min.X)].
 	Pix []uint16
+	// MaxVal is the highest value occurring in this image
+	MaxVal uint16
 	// Stride is the Pix stride (in bytes) between vertically adjacent pixels.
 	Stride int
 	// Rect is the image's bounds.
@@ -80,5 +85,17 @@ func (p *Gray16) Opaque() bool {
 func NewGray16(r image.Rectangle) *Gray16 {
 	w, h := r.Dx(), r.Dy()
 	pix := make([]uint16, w*h)
-	return &Gray16{pix, w, r}
+	return &Gray16{
+		Pix:    pix,
+		Stride: w,
+		Rect:   r,
+	}
+}
+
+func (p *Gray16) Normalise() {
+	ratio := float64(math.MaxUint16) / float64(p.MaxVal)
+	for i, v := range p.Pix {
+		p.Pix[i] = uint16(float64(v) * ratio)
+	}
+	p.MaxVal = math.MaxUint16
 }

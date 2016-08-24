@@ -3,8 +3,9 @@ package hough
 
 import (
 	"image"
-	"image/draw"
 	"math"
+
+	"github.com/piersy/hough-go/util"
 )
 
 // Hough takes an input image and returns the hough transform of that image
@@ -12,7 +13,7 @@ import (
 // line distance from centre of the input and the x axis represents the angle
 // of the line. Only black pixels are considered as contributing to the hough
 // transform.
-func Hough(input image.Image, accDistance, accAngle int) (draw.Image, []Line) {
+func Hough(input image.Image, accDistance, accAngle int) *util.Gray16 {
 	width := input.Bounds().Dx()
 	height := input.Bounds().Dy()
 	midX := float64(width) / 2
@@ -21,9 +22,9 @@ func Hough(input image.Image, accDistance, accAngle int) (draw.Image, []Line) {
 	sinAngles := make([]float64, accDistance)
 	cosAngles := make([]float64, accDistance)
 	// Converts our accumulator angle buckets into appropriate radian values between 0 and Pi
-	angleN := NewNormaliser(0, float64(accAngle), 0, math.Pi)
+	angleN := util.NewNormaliser(0, float64(accAngle), 0, math.Pi)
 	for t := 0; t < accAngle; t++ {
-		a := angleN.normalise(float64(t))
+		a := angleN.Normalise(float64(t))
 		sinAngles[t] = math.Sin(a)
 		cosAngles[t] = math.Cos(a)
 	}
@@ -31,17 +32,14 @@ func Hough(input image.Image, accDistance, accAngle int) (draw.Image, []Line) {
 	// The max distance from centre, used for normalising the distance from the
 	// source image to the size of the accumulator.
 	maxDistance := math.Sqrt(float64(width*width+height*height)) / 2
-	distN := NewNormaliser(-maxDistance, maxDistance, 0, float64(accDistance))
+	distN := util.NewNormaliser(-maxDistance, maxDistance, 0, float64(accDistance))
 
-	nrgba := *input.(*image.RGBA)
-	acc := NewGray16(image.Rect(0, 0, accDistance, accAngle))
+	at := getRgba(input)
+	acc := util.NewGray16(image.Rect(0, 0, accDistance, accAngle))
 	stride := acc.Stride
 	pix := acc.Pix
+	var maxVal uint16
 
-	// keeps track of the highest scoring lines
-	tl := topLines{
-		lineCount: 100,
-	}
 	// Iterate each pixel in the source
 	for x := 0; x < width; x++ {
 		px := float64(x) - midX
@@ -49,7 +47,7 @@ func Hough(input image.Image, accDistance, accAngle int) (draw.Image, []Line) {
 			py := float64(y) - midY
 
 			// check black pixel
-			r, g, b, _ := nrgba.RGBAAt(x, y).RGBA()
+			r, g, b, _ := at(x, y)
 			if r&g&b == 0 {
 				// For all angles represented in the accumulator, calculate
 				// perpendicular distance to the center of the input for a line
@@ -62,7 +60,7 @@ func Hough(input image.Image, accDistance, accAngle int) (draw.Image, []Line) {
 					//Get normal distance can be negative
 					distance := px*cosAngles[t] + py*sinAngles[t]
 					// normalize distance into accumulator range
-					nDistance := int(distN.normalise(distance) + 0.5)
+					nDistance := int(distN.Normalise(distance) + 0.5)
 					//		g := acc.Gray16At(t, nDistance)
 					//		g.Y += 100
 					//acc.SetGray16(t, nDistance, g)
@@ -70,31 +68,50 @@ func Hough(input image.Image, accDistance, accAngle int) (draw.Image, []Line) {
 					// Get pixel start location
 					pixStart := nDistance*stride + t
 					val := pix[pixStart]
-					val += 100
-					pix[pixStart] = val
-					// Add the line to the top lines if it scores above the boundary
-					if val > tl.boundary {
-						tl.addLine(angleN.normalise(float64(t)), distance, val)
+					val++
+					if val > maxVal {
+						maxVal = val
 					}
+					pix[pixStart] = val
 				}
 			}
 		}
 	}
-	return acc, tl.lines()
+	// Set the max val on the acc so that it can be normalised correctly
+	acc.MaxVal = maxVal
+	return acc
 }
 
-func NewNormaliser(srcMin, srcMax, dstMin, dstMax float64) noramliser {
-	return noramliser{
-		ratio:  (dstMax - dstMin) / (srcMax - srcMin),
-		srcMin: srcMin,
-		dstMin: dstMin,
+// getAt reruns the At method defined on the underlying struct implementing
+// image.Image, if the image type is unknown then this function panics.
+// This performs about 25% better than calling at on an interface, I will accept it for now.
+// best performance is achieved by calling the types at method in the main loop of hough
+// but that would mean writing the algorithm once for each image type.
+func getRgba(i image.Image) func(int, int) (uint32, uint32, uint32, uint32) {
+	switch t := i.(type) {
+	case *image.Alpha:
+		return nil
+	case *image.Alpha16:
+		return nil
+	case *image.Gray:
+		return nil
+	case *image.Gray16:
+		return nil
+	case *image.NRGBA:
+		return func(x, y int) (uint32, uint32, uint32, uint32) {
+			return t.NRGBAAt(x, y).RGBA()
+		}
+	case *image.NRGBA64:
+		return nil
+	case *image.Paletted:
+		return nil
+	case *image.RGBA:
+		return func(x, y int) (uint32, uint32, uint32, uint32) {
+			return t.RGBAAt(x, y).RGBA()
+		}
+	case *image.RGBA64:
+		return nil
+	default:
+		panic("unrecognised image type")
 	}
-}
-
-type noramliser struct {
-	ratio, srcMin, dstMin float64
-}
-
-func (n noramliser) normalise(val float64) float64 {
-	return n.ratio*(val-n.srcMin) + n.dstMin
 }

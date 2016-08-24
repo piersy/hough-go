@@ -39,16 +39,14 @@ func main() {
 		fmt.Printf("%v\n", err)
 		os.Exit(1)
 	}
-	acc, lines := hough.Hough(baseImage, 400, 400)
-	for _, l := range lines {
-		fmt.Println(l)
-	}
+	acc := hough.Hough(baseImage, 400, 400)
 	outFile, err := os.Create(*out)
 	defer outFile.Close()
 	if err != nil {
 		println(err)
 		os.Exit(1)
 	}
+	acc.Normalise()
 	png.Encode(outFile, acc)
 
 	testOut, err := os.Create("testout.png")

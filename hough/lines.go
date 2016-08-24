@@ -70,8 +70,6 @@ func (t *topLines) minElement() int {
 func (t *topLines) lines() []Line {
 	res := make([]Line, len(t.l))
 	for i, _ := range t.l {
-		fmt.Printf("lineandscore %v\n", t.l[i])
-
 		res[i] = t.l[i].line
 	}
 	return res
