@@ -34,7 +34,7 @@ func Hough(input image.Image, accDistance, accAngle int) (draw.Image, []Line) {
 	distN := NewNormaliser(-maxDistance, maxDistance, 0, float64(accDistance))
 
 	nrgba := *input.(*image.RGBA)
-	acc := image.NewGray16(image.Rect(0, 0, accDistance, accAngle))
+	acc := NewGray16(image.Rect(0, 0, accDistance, accAngle))
 	stride := acc.Stride
 	pix := acc.Pix
 
@@ -68,12 +68,10 @@ func Hough(input image.Image, accDistance, accAngle int) (draw.Image, []Line) {
 					//acc.SetGray16(t, nDistance, g)
 					// update the accumulator
 					// Get pixel start location
-					pixStart := nDistance*stride + t*2
-					val := uint16(pix[pixStart])<<8 | uint16(pix[pixStart+1])
-					val += 10
-					pix[pixStart] = uint8(val >> 8)
-					pix[pixStart+1] = uint8(val)
-
+					pixStart := nDistance*stride + t
+					val := pix[pixStart]
+					val += 100
+					pix[pixStart] = val
 					// Add the line to the top lines if it scores above the boundary
 					if val > tl.boundary {
 						tl.addLine(angleN.normalise(float64(t)), distance, val)
