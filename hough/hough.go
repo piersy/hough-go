@@ -2,6 +2,7 @@
 package hough
 
 import (
+	"fmt"
 	"image"
 	"math"
 
@@ -16,23 +17,55 @@ import (
 func Hough(input image.Image, accDistance, accAngle int) *util.Gray16 {
 	width := input.Bounds().Dx()
 	height := input.Bounds().Dy()
+	fmt.Printf("input image size (%d,%d)\n", width, height)
 	midX := float64(width) / 2
 	midY := float64(height) / 2
-	// Precalculate angles for sin and cos
-	sinAngles := make([]float64, accDistance)
-	cosAngles := make([]float64, accDistance)
+	// Precalculate angles and scale factor for sin and cos
+	sinAngles := make([]float64, accAngle)
+	cosAngles := make([]float64, accAngle)
+	scaleFactor := make([]float64, accAngle)
+	//scaleFactor := make([]float64, accAngle)
 	// Converts our accumulator angle buckets into appropriate radian values between 0 and Pi
 	angleN := util.NewNormaliser(0, float64(accAngle), 0, math.Pi)
+	//we also need to scale distances based on the angle to account for the difference between
+	//diagonal and straight edges across a pixel.
+	// at 45degrees we want to scale distances by 1/sqrrt(2) at vertical and horizontal then the scale is 1
+	// 45 degreees is pi/4 and 3pi/4 my problem is that this has to rise up and drop twice for the precalcs or just
+	// calculate the first quarter and then reverse and append but only works for even lenghthed accumulators
+	//we can use a triangle wave formula to generate the input angle for calculating the scale factor.
+	po4 := math.Pi / 4.0
 	for t := 0; t < accAngle; t++ {
 		a := angleN.Normalise(float64(t))
 		sinAngles[t] = math.Sin(a)
 		cosAngles[t] = math.Cos(a)
+		//cretes a triangle wave rising fom 0 to pi/4 back to 0 again
+		//we use the wave as input to 1 * 1/(cos x) calculate the area accross a pixel with
+
+		//     --------------
+		//          /       |
+		//         /        |
+		//        /         |
+		//       /          |
+		//      /           |
+		//     /x)          |
+		//     --------------
+		scaleAngle := po4 - math.Abs(math.Mod(a, 2*po4)-po4)
+		scaleFactor[t] = math.Cos(scaleAngle)
+		//println("scaleFac", t, scaleFactor[t])
 	}
 
 	// The max distance from centre, used for normalising the distance from the
 	// source image to the size of the accumulator.
 	maxDistance := math.Sqrt(float64(width*width+height*height)) / 2
-	distN := util.NewNormaliser(-maxDistance, maxDistance, 0, float64(accDistance))
+	//println("maxDist", maxDistance)
+	//maxDistance /= maxDistance / math.Max(midX, midY)
+	//	//println("maxDist", maxDistance)
+	//maxDistance = math.Max(midX, midY)
+	fmt.Printf("maxDist %f\n\n", maxDistance)
+
+	//	the max dist in fact needs to be scaled with the appropriate scale factor depending on the angle from centre image to corner
+	//in fact the max distance once scaled will be the simply the greater of either half width or half height.
+	distN := util.NewNormaliser(-maxDistance, maxDistance, 0, float64(accDistance-1))
 
 	at := getRgba(input)
 	acc := util.NewGray16(image.Rect(0, 0, accDistance, accAngle))
@@ -40,11 +73,17 @@ func Hough(input image.Image, accDistance, accAngle int) *util.Gray16 {
 	pix := acc.Pix
 	var maxVal uint16
 
+	var maxDist float64 = 0.0
 	// Iterate each pixel in the source
 	for x := 0; x < width; x++ {
 		px := float64(x) - midX
 		for y := 0; y < height; y++ {
 			py := float64(y) - midY
+			//Ok the second part of this should be normalised to 1 but it is not
+			// see http://mathproofs.blogspot.co.uk/2005/07/mapping-square-to-circle.html
+			//these are not quite working
+			//sx := px * math.Sqrt(1.0-(py/midY*py/midX/2.0))
+			//sy := py * math.Sqrt(1.0-(px/midX*px/midX/2.0))
 
 			// check black pixel
 			r, g, b, _ := at(x, y)
@@ -59,13 +98,46 @@ func Hough(input image.Image, accDistance, accAngle int) *util.Gray16 {
 				for t := 0; t < accAngle; t++ {
 					//Get normal distance can be negative
 					distance := px*cosAngles[t] + py*sinAngles[t]
+					//square shit
+					//neg := distance < 0.0
+					////normalise into square coords and recalculate distance
+					//nowX := distance * math.Cos(angleN.Normalise(float64(t)))
+					//nowY := distance * math.Sin(angleN.Normalise(float64(t)))
+					//sx := nowX * math.Sqrt(1.0-(nowY/midY*nowY/midX/2.0))
+					//sy := nowY * math.Sqrt(1.0-(nowX/midX*nowX/midX/2.0))
+					//distance = math.Sqrt(sx*sx + sy*sy)
+					//if neg {
+					//	distance = -distance
+					//}
+
+					//adjust distance by scale factor
+					distance = distance * scaleFactor[t]
+
+					//distance = distance / math.Sqrt2
 					// normalize distance into accumulator range
-					nDistance := int(distN.Normalise(distance) + 0.5)
-					//		g := acc.Gray16At(t, nDistance)
-					//		g.Y += 100
+					nDistance := int(distN.Normalise(distance))
+					if distance > maxDist {
+						maxDist = distance
+					}
+					if distance > maxDistance {
+						//fmt.Printf("Raw dist %f\n", rawDist)
+						fmt.Printf("scaled dist %f\n", distance)
+						fmt.Printf("max dist for this spot %f\n", math.Sqrt(px*px+py*py))
+						fmt.Printf("scale fac %f\n", scaleFactor[t])
+						fmt.Printf("ndistatnce %d\n", nDistance)
+						fmt.Printf(" acc angle %d\n", t)
+						fmt.Printf(" real angle %f\n", angleN.Normalise(float64(t)))
+						fmt.Printf("x:%f y:%f\n", px, py)
+						fmt.Printf("\n")
+						//os.Exit(1)
+
+					}
+
+					//g := acc.Gray16At(t, nDistance)
+					//g.Y += 100
 					//acc.SetGray16(t, nDistance, g)
-					// update the accumulator
-					// Get pixel start location
+					//update the accumulator
+					//Get pixel start location
 					pixStart := nDistance*stride + t
 					val := pix[pixStart]
 					val++
@@ -77,6 +149,8 @@ func Hough(input image.Image, accDistance, accAngle int) *util.Gray16 {
 			}
 		}
 	}
+	fmt.Printf("Max unnormalised but scaled dist %f\n", maxDist)
+
 	// Set the max val on the acc so that it can be normalised correctly
 	acc.MaxVal = maxVal
 	return acc
