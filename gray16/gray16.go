@@ -1,4 +1,4 @@
-package util
+package gray16
 
 import (
 	"image"

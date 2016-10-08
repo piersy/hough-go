@@ -10,7 +10,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/piersy/hough-go/util"
+	"github.com/piersy/hough-go/norm"
 )
 
 var (
@@ -40,7 +40,7 @@ func BenchmarkNormaliseGray16(b *testing.B) {
 }
 
 func normalise(pix []uint16, min, max uint16) {
-	n := util.NewNormaliser(float64(min), float64(max), 0, float64(math.MaxUint16))
+	n := norm.NewNormaliser(float64(min), float64(max), 0, float64(math.MaxUint16))
 	for i := 0; i < len(pix); i++ {
 		pix[i] = uint16(n.Normalise(float64(pix[i])) + 0.5)
 	}

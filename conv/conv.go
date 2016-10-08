@@ -5,7 +5,7 @@ import (
 	"image/color"
 	"math"
 
-	"github.com/piersy/hough-go/util"
+	"github.com/piersy/hough-go/gray16"
 )
 
 type kernel struct {
@@ -13,11 +13,11 @@ type kernel struct {
 	stride uint16
 }
 
-func AdaptiveThresh(input *util.Gray16) *util.Gray16 {
+func AdaptiveThresh(input *gray16.Gray16) *gray16.Gray16 {
 	c := float64(math.MaxUint16 / 2)
 	max := color.Gray16{math.MaxUint16}
 	min := color.Gray16{}
-	output := util.NewGray16(input.Bounds())
+	output := gray16.NewGray16(input.Bounds())
 	width := input.Bounds().Dx()
 	height := input.Bounds().Dy()
 	for x := 0; x < width; x++ {

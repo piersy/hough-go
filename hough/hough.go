@@ -5,7 +5,8 @@ import (
 	"image"
 	"math"
 
-	"github.com/piersy/hough-go/util"
+	"github.com/piersy/hough-go/gray16"
+	"github.com/piersy/hough-go/norm"
 )
 
 // Hough takes an input image and returns the hough transform of that image
@@ -13,7 +14,7 @@ import (
 // line distance from centre of the input and the x axis represents the angle
 // of the line. Only black pixels are considered as contributing to the hough
 // transform.
-func Hough(input image.Image, accDistance, accAngle int) *util.Gray16 {
+func Hough(input image.Image, accDistance, accAngle int) *gray16.Gray16 {
 	width := input.Bounds().Dx()
 	height := input.Bounds().Dy()
 	midX := float64(width) / 2
@@ -22,7 +23,7 @@ func Hough(input image.Image, accDistance, accAngle int) *util.Gray16 {
 	sinAngles := make([]float64, accDistance)
 	cosAngles := make([]float64, accDistance)
 	// Converts our accumulator angle buckets into appropriate radian values between 0 and Pi
-	angleN := util.NewNormaliser(0, float64(accAngle), 0, math.Pi)
+	angleN := norm.NewNormaliser(0, float64(accAngle), 0, math.Pi)
 	for t := 0; t < accAngle; t++ {
 		a := angleN.Normalise(float64(t))
 		sinAngles[t] = math.Sin(a)
@@ -32,10 +33,10 @@ func Hough(input image.Image, accDistance, accAngle int) *util.Gray16 {
 	// The max distance from centre, used for normalising the distance from the
 	// source image to the size of the accumulator.
 	maxDistance := math.Sqrt(float64(width*width+height*height)) / 2
-	distN := util.NewNormaliser(-maxDistance, maxDistance, 0, float64(accDistance))
+	distN := norm.NewNormaliser(-maxDistance, maxDistance, 0, float64(accDistance))
 
 	at := getRgba(input)
-	acc := util.NewGray16(image.Rect(0, 0, accDistance, accAngle))
+	acc := gray16.NewGray16(image.Rect(0, 0, accDistance, accAngle))
 	stride := acc.Stride
 	pix := acc.Pix
 	var maxVal uint16

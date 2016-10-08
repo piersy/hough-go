@@ -1,4 +1,4 @@
-package util
+package norm
 
 type noramliser struct {
 	ratio, srcMin, dstMin float64
