@@ -32,14 +32,14 @@ func dotest() error {
 	fmt.Printf("image bounds: %v\n", im.Bounds())
 	c := canvas.New()
 	c.Color(color.White)
-	corner := image.Pt(49, 49)
+	centre := image.Pt(49, 49)
 	incr := math.Pi / (2 * 10)
 	t := float64(0)
 	for ; t <= math.Pi*2; t += incr {
-		c.Move(corner)
+		c.MoveTo(centre)
 		y := math.Sin(t) * 50
 		x := math.Cos(t) * 50
-		c.Line(image.Pt(int(x+0.5)+corner.X, int(y+0.5)+corner.Y))
+		c.LineTo(image.Pt(int(x+0.5)+centre.X, int(y+0.5)+centre.Y))
 	}
 	err := c.Render(im)
 	if err != nil {
