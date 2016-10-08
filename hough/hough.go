@@ -57,22 +57,29 @@ func Hough(input image.Image, accDistance, accAngle int) *util.Gray16 {
 				// at angle t and hence the point (d(t), t) will conicide for
 				// all pixels along the line.
 				for t := 0; t < accAngle; t++ {
-					//Get normal distance can be negative
+					//Get normal distance - can be negative
 					distance := px*cosAngles[t] + py*sinAngles[t]
-					// normalize distance into accumulator range
-					nDistance := int(distN.Normalise(distance) + 0.5)
-					//		g := acc.Gray16At(t, nDistance)
-					//		g.Y += 100
-					//acc.SetGray16(t, nDistance, g)
-					// update the accumulator
-					// Get pixel start location
-					pixStart := nDistance*stride + t
-					val := pix[pixStart]
-					val++
-					if val > maxVal {
-						maxVal = val
+					// normalize distance into accumulator range.
+					// Accumulator range cannot benegative
+					dist := distN.Normalise(distance)
+					// The distance is likely to fall between two of our
+					// accumulator buckets so we divide the score
+					// appropriately between the buckets.
+					intDist := int(dist)
+					floatingPointPart := dist - float64(intDist)
+					//find different components of the score
+					further := 10.0 * floatingPointPart
+					nearer := 10.0 * (1.0 - floatingPointPart)
+					// Update the further pixel
+					pixel := (intDist+1)*stride + t
+					if pixel < len(pix) {
+						increment(uint16(further), &pix[pixel], &maxVal)
 					}
-					pix[pixStart] = val
+					// Update the nearer pixel
+					pixel = intDist*stride + t
+					if pixel < len(pix) {
+						increment(uint16(nearer), &pix[pixel], &maxVal)
+					}
 				}
 			}
 		}
@@ -80,6 +87,19 @@ func Hough(input image.Image, accDistance, accAngle int) *util.Gray16 {
 	// Set the max val on the acc so that it can be normalised correctly
 	acc.MaxVal = maxVal
 	return acc
+}
+
+func increment(inc uint16, initial, max *uint16) {
+	result := *initial + inc
+	if result > *max {
+		*max = result
+	}
+	//Overflow simply hard limit at max
+	if result < *initial {
+		*max = math.MaxUint16
+		result = math.MaxUint16
+	}
+	*initial = result
 }
 
 // getAt reruns the At method defined on the underlying struct implementing
