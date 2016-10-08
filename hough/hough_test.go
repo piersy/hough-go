@@ -25,13 +25,22 @@ func BenchmarkHough(b *testing.B) {
 	input := getImage(b)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		Hough(input, 400, 400)
+		Hough(input, HoughParams(input, 400, 400))
+	}
+}
+
+func BenchmarkSplitHough(b *testing.B) {
+	input := getImage(b)
+	b.ResetTimer()
+	hp := HoughParams(input, 400, 400)
+	for i := 0; i < b.N; i++ {
+		Hough(input, hp)
 	}
 }
 
 func BenchmarkNormaliseGray16(b *testing.B) {
 	input := getImage(b)
-	gray := Hough(input, 400, 400)
+	gray := Hough(input, HoughParams(input, 400, 400))
 	pix := gray.Pix
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -48,7 +57,7 @@ func normalise(pix []uint16, min, max uint16) {
 
 func BenchmarkNormaliseGray16Method(b *testing.B) {
 	input := getImage(b)
-	gray := Hough(input, 400, 400)
+	gray := Hough(input, HoughParams(input, 400, 400))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		gray.Normalise()

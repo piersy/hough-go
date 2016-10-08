@@ -8,43 +8,62 @@ import (
 	"github.com/piersy/hough-go/util"
 )
 
-// Hough takes an input image and returns the hough transform of that image
-// with size accDistance * accAngles. The y axis  of this image represents the
-// line distance from centre of the input and the x axis represents the angle
-// of the line. Only black pixels are considered as contributing to the hough
-// transform.
-func Hough(input image.Image, accDistance, accAngle int) *util.Gray16 {
-	width := input.Bounds().Dx()
-	height := input.Bounds().Dy()
-	midX := float64(width) / 2
-	midY := float64(height) / 2
-	// Precalculate angles for sin and cos
-	sinAngles := make([]float64, accDistance)
-	cosAngles := make([]float64, accDistance)
+type houghParams struct {
+	sinAngles, cosAngles []float64
+	width, height        int
+	midX, midY           float64
+	distanceDivisions    int
+	distanceNormaliser   util.Normaliser
+}
+
+// HoughParams generates a set of parameters with which a hough transform can
+// be applied the same parameters can be reused on many transforms having the
+// same input and output image sizes. The distance divisions and angle
+// divisions define the hough transform output size, with distanceDivisions
+// being pixels in the y dimension and angleDivisions being pixels in the x
+// dimension.
+func HoughParams(input image.Image, distanceDivisions, angleDivisions int) houghParams {
+	params := houghParams{
+		sinAngles:         make([]float64, angleDivisions),
+		cosAngles:         make([]float64, angleDivisions),
+		width:             input.Bounds().Dx(),
+		height:            input.Bounds().Dy(),
+		distanceDivisions: distanceDivisions,
+	}
+	params.midX = float64(params.width) / 2
+	params.midY = float64(params.height) / 2
 	// Converts our accumulator angle buckets into appropriate radian values between 0 and Pi
-	angleN := util.NewNormaliser(0, float64(accAngle), 0, math.Pi)
-	for t := 0; t < accAngle; t++ {
+	angleN := util.NewNormaliser(0, float64(angleDivisions), 0, math.Pi)
+	for t := 0; t < angleDivisions; t++ {
 		a := angleN.Normalise(float64(t))
-		sinAngles[t] = math.Sin(a)
-		cosAngles[t] = math.Cos(a)
+		params.sinAngles[t] = math.Sin(a)
+		params.cosAngles[t] = math.Cos(a)
 	}
 
 	// The max distance from centre, used for normalising the distance from the
 	// source image to the size of the accumulator.
-	maxDistance := math.Sqrt(float64(width*width+height*height)) / 2
-	distN := util.NewNormaliser(-maxDistance, maxDistance, 0, float64(accDistance))
+	maxDistance := math.Sqrt(float64(params.width*params.width+params.height*params.height)) / 2
+	params.distanceNormaliser = util.NewNormaliser(-maxDistance, maxDistance, 0, float64(distanceDivisions))
+	return params
+}
 
+// Hough takes an input image and and a houghParams instance and returns the
+// hough transform of that image. The y axis  of the output image represents the
+// line distance from centre of the input and the x axis represents the angle
+// of the line. Only black pixels are considered as contributing to the hough
+// transform.
+func Hough(input image.Image, hp houghParams) *util.Gray16 {
 	at := getRgba(input)
-	acc := util.NewGray16(image.Rect(0, 0, accDistance, accAngle))
+	acc := util.NewGray16(image.Rect(0, 0, hp.distanceDivisions, len(hp.cosAngles)))
 	stride := acc.Stride
 	pix := acc.Pix
 	var maxVal uint16
 
 	// Iterate each pixel in the source
-	for x := 0; x < width; x++ {
-		px := float64(x) - midX
-		for y := 0; y < height; y++ {
-			py := float64(y) - midY
+	for x := 0; x < hp.width; x++ {
+		px := float64(x) - hp.midX
+		for y := 0; y < hp.height; y++ {
+			py := float64(y) - hp.midY
 
 			// check black pixel
 			r, g, b, _ := at(x, y)
@@ -56,12 +75,12 @@ func Hough(input image.Image, accDistance, accAngle int) *util.Gray16 {
 				// with this pixel will share the same perpendicular distance
 				// at angle t and hence the point (d(t), t) will conicide for
 				// all pixels along the line.
-				for t := 0; t < accAngle; t++ {
+				for t := 0; t < len(hp.sinAngles); t++ {
 					//Get normal distance - can be negative
-					distance := px*cosAngles[t] + py*sinAngles[t]
+					distance := px*hp.cosAngles[t] + py*hp.sinAngles[t]
 					// normalize distance into accumulator range.
 					// Accumulator range cannot benegative
-					dist := distN.Normalise(distance)
+					dist := hp.distanceNormaliser.Normalise(distance)
 					// The distance is likely to fall between two of our
 					// accumulator buckets so we divide the score
 					// appropriately between the buckets.
