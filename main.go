@@ -12,7 +12,9 @@ import (
 	"math"
 	"os"
 
+	"github.com/piersy/hough-go/blob"
 	"github.com/piersy/hough-go/canvas"
+	"github.com/piersy/hough-go/conv"
 	"github.com/piersy/hough-go/hough"
 )
 
@@ -47,8 +49,13 @@ func main() {
 		os.Exit(1)
 	}
 	acc.Normalise()
+	acc = conv.AdaptiveThresh(acc)
 	png.Encode(outFile, acc)
 
+	blobs := blob.Find(acc)
+	for i, b := range blobs {
+		fmt.Printf("Blob %d centre: %+v\n", i, b.Centre())
+	}
 	testOut, err := os.Create("testout.png")
 	defer testOut.Close()
 	if err != nil {

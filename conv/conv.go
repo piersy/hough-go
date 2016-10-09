@@ -1,4 +1,4 @@
-// Package conv provides functionality to convolve images
+// Package conv provides functionality to convolve images.
 package conv
 
 import (
