@@ -41,10 +41,7 @@ func dotest() error {
 		x := math.Cos(t) * 50
 		c.LineTo(image.Pt(int(x+0.5)+centre.X, int(y+0.5)+centre.Y))
 	}
-	err := c.Render(im)
-	if err != nil {
-		return err
-	}
+	c.Render(im)
 	outFile, err := os.Create(*out)
 	defer outFile.Close()
 	if err != nil {

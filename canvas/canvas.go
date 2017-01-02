@@ -41,29 +41,57 @@ func (l line) do(i draw.Image) {
 	}
 }
 
+// getIntercepts returns the points at which the line defined by angle and
+// distance from the centre of the given rectangle intercept its bounds.
 func getIntercepts(angle, distance float64, b image.Rectangle) []image.Point {
-	gradient := math.Tan(angle + math.Pi/2.0)
-	x := distance * math.Cos(angle)
-	y := distance * math.Sin(angle)
+	//Special cases for lines without gradient
+	// vertical
+	if angle == 0 || math.Mod(angle, math.Pi) == 0 {
+		return []image.Point{image.Point{int(distance), b.Min.Y}, image.Point{int(distance), b.Max.Y}}
 
-	var points []image.Point
+	}
+	// horizontal
+	//if math.Mod(angle, math.Pi/2.0) == 0 {
+	//	return []image.Point{image.Point{b.Min.X, int(distance)}, image.Point{b.Max.X, int(distance)}}
+
+	//}
 	// Find intercepts with bounds
 	var intercept float64
 	xmin := float64(b.Min.X)
 	xmax := float64(b.Max.X)
 	ymin := float64(b.Min.Y)
 	ymax := float64(b.Max.Y)
+	fmt.Printf("xmin: %.3f\n", xmin)
+	fmt.Printf("xmax: %.3f\n", xmax)
+	fmt.Printf("ymin: %.3f\n", ymin)
+	fmt.Printf("ymax: %.3f\n", ymax)
+
+	gradient := math.Tan(angle + math.Pi/2.0)
+	fmt.Printf("Gradient: %.3f\n", gradient)
+	// calculate the coords of the intersection of the line and the
+	// perpendicular relative to the centre.  We will then project both ways
+	// from this point, using the gradient to direct the projection and see
+	// where that intersects with the bounds.
+	x := float64(b.Bounds().Dx())/2.0 + xmin + distance*math.Cos(angle)
+	y := float64(b.Bounds().Dy())/2.0 + ymin + distance*math.Sin(angle)
+
+	fmt.Printf("x distance: %.3f\n", x)
+	fmt.Printf("y distance: %.3f\n", y)
+	var points []image.Point
 
 	// y intercept at lower x bound
 	intercept = y - ((x - xmin) * gradient)
-	fmt.Printf("low x y intercept %3f\n", intercept)
 	if intercept >= ymin && intercept <= ymax {
+		fmt.Printf("low x, y intercept %3f\n", intercept)
 		points = append(points, image.Point{int(xmin), int(intercept)})
 	}
 	// y intercept at upper x bound
 	intercept = y + ((xmax - x) * gradient)
-	fmt.Printf("high x y intercept %3f\n", intercept)
+	fmt.Printf("high x, y intercept %3f\n", intercept)
+	fmt.Printf("%g >= %g && %g <= %g, %t\n", intercept, ymin, intercept, ymax, intercept >= ymin)
 	if intercept >= ymin && intercept <= ymax {
+		fmt.Println("doing the high x intercept")
+		fmt.Printf("high x, y intercept %3f\n", intercept)
 		points = append(points, image.Point{int(xmax), int(intercept)})
 	}
 
@@ -72,9 +100,10 @@ func getIntercepts(angle, distance float64, b image.Rectangle) []image.Point {
 	}
 	// x intercept at lower y bound
 	invGradient := 1.0 / gradient
+	fmt.Printf("invGradient: %.3f\n", invGradient)
 	intercept = x - ((y - ymin) * invGradient)
-	fmt.Printf("low y x intercept %3f\n", intercept)
 	if intercept >= xmin && intercept <= xmax {
+		fmt.Printf("low y, x intercept %3f\n", intercept)
 		points = append(points, image.Point{int(intercept), int(ymin)})
 	}
 	if len(points) == 2 {
@@ -82,8 +111,8 @@ func getIntercepts(angle, distance float64, b image.Rectangle) []image.Point {
 	}
 	// x intercept at upper y bound
 	intercept = x + ((ymax - y) * invGradient)
-	fmt.Printf("high y x intercept %3f\n", intercept)
 	if intercept >= ymin && intercept <= ymax {
+		fmt.Printf("high y, x intercept %3f\n", intercept)
 		points = append(points, image.Point{int(intercept), int(ymax)})
 	}
 	return points

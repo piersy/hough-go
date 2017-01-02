@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"image"
+	"image/color"
 	"image/draw"
 	_ "image/gif"
 	_ "image/jpeg"
@@ -16,6 +17,7 @@ import (
 	"github.com/piersy/hough-go/canvas"
 	"github.com/piersy/hough-go/conv"
 	"github.com/piersy/hough-go/hough"
+	"github.com/piersy/hough-go/norm"
 )
 
 var (
@@ -41,7 +43,9 @@ func main() {
 		fmt.Printf("%v\n", err)
 		os.Exit(1)
 	}
-	acc := hough.Hough(baseImage, 400, 400)
+	accAngles := 400
+	accDistances := 400
+	acc := hough.Hough(baseImage, accDistances, accAngles)
 	outFile, err := os.Create(*out)
 	defer outFile.Close()
 	if err != nil {
@@ -52,20 +56,23 @@ func main() {
 	acc = conv.AdaptiveThresh(acc)
 	png.Encode(outFile, acc)
 
-	blobs := blob.Find(acc)
-	for i, b := range blobs {
-		fmt.Printf("Blob %d centre: %+v\n", i, b.Centre())
-	}
 	testOut, err := os.Create("testout.png")
 	defer testOut.Close()
 	if err != nil {
 		println(err)
 		os.Exit(1)
 	}
-	//ctx := canvas.New()
-	//ctx.Move(image.Pt(0, 100))
-	//ctx.Line(image.Pt(300, 100))
-	//ctx.Render(im)
+	an := norm.NewNormaliser(0, float64(accAngles), 0, math.Pi)
+	maxDistance := math.Sqrt(float64(baseImage.Bounds().Dx()*baseImage.Bounds().Dx()+baseImage.Bounds().Dy()*baseImage.Bounds().Dy())) / 2.0
+	dn := norm.NewNormaliser(0, float64(accDistances), -maxDistance, maxDistance)
+	ctx := canvas.New()
+	ctx.Color(color.NRGBA{255, 0, 0, 255})
+	blobs := blob.Find(acc)
+	for i, b := range blobs {
+		fmt.Printf("Blob %d centre: %+v\n", i, b.Centre())
+		ctx.Line(dn.Normalise(b.Centre().Y), an.Normalise(b.Centre().X))
+	}
+	ctx.Render(baseImage.(draw.Image))
 	png.Encode(testOut, baseImage)
 }
 
@@ -120,16 +127,12 @@ func (l line) Draw(i draw.Image) error {
 		points = append(points, image.Pt(int(x+midX), height))
 	}
 	if len(points) != 2 {
-
-		fmt.Errorf("Something went wrong %d points found", len(points))
+		return fmt.Errorf("Something went wrong %d points found", len(points))
 	}
 	ctx := canvas.New()
 	ctx.MoveTo(points[0])
 	ctx.LineTo(points[1])
-	err := ctx.Render(i)
-	if err != nil {
-		return err
-	}
+	ctx.Render(i)
 	return nil
 
 }
