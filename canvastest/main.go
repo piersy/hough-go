@@ -18,6 +18,7 @@ var (
 	out = flag.String("out", "", "output image")
 )
 
+// This program exercises the LineTo functionality of the drawing context.
 func main() {
 	err := dotest()
 	if err != nil {

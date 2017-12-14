@@ -41,20 +41,23 @@ func (l line) do(i draw.Image) {
 	}
 }
 
-// getIntercepts returns the points at which the line defined by angle and
-// distance from the centre of the given rectangle intercept its bounds.
+// getIntercepts returns the points at which the line defined by angle in
+// radians and distance in pixels from the centre of the given rectangle
+// intercept with the bounds of the rectangle. If the returned slice is empty
+// it indicates that the given line does not intercept the bounds of the
+// rectangle.
 func getIntercepts(angle, distance float64, b image.Rectangle) []image.Point {
-	//Special cases for lines without gradient
+	//Special cases for lines without gradient, this avoids division by zero errors.
 	// vertical
 	if angle == 0 || math.Mod(angle, math.Pi) == 0 {
 		return []image.Point{image.Point{int(distance), b.Min.Y}, image.Point{int(distance), b.Max.Y}}
 
 	}
-	// horizontal
-	//if math.Mod(angle, math.Pi/2.0) == 0 {
-	//	return []image.Point{image.Point{b.Min.X, int(distance)}, image.Point{b.Max.X, int(distance)}}
+	//horizontal
+	if math.Mod(angle, math.Pi/2.0) == 0 {
+		return []image.Point{image.Point{b.Min.X, int(distance)}, image.Point{b.Max.X, int(distance)}}
 
-	//}
+	}
 	// Find intercepts with bounds
 	var intercept float64
 	xmin := float64(b.Min.X)
@@ -69,9 +72,9 @@ func getIntercepts(angle, distance float64, b image.Rectangle) []image.Point {
 	gradient := math.Tan(angle + math.Pi/2.0)
 	fmt.Printf("Gradient: %.3f\n", gradient)
 	// calculate the coords of the intersection of the line and the
-	// perpendicular relative to the centre.  We will then project both ways
-	// from this point, using the gradient to direct the projection and see
-	// where that intersects with the bounds.
+	// perpendicular relative to the centre of the given rectangle.  We will
+	// then project both ways from this point, using the gradient to direct the
+	// projection and see where that intersects with the bounds.
 	x := float64(b.Bounds().Dx())/2.0 + xmin + distance*math.Cos(angle)
 	y := float64(b.Bounds().Dy())/2.0 + ymin + distance*math.Sin(angle)
 
